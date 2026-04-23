@@ -1,10 +1,13 @@
-use xenocanto::search::SearchTag;
+use xenocanto::search::SearchTerm;
 
 #[tokio::main(flavor = "current_thread")]
 async fn main() -> anyhow::Result<()> {
-    let xcservice = xenocanto::Service::new(&std::env::var("XC_API_KEY")?);
+    tracing_subscriber::fmt::init();
+    let xcservice = xenocanto::Service::with_key(&std::env::var("XC_API_KEY")?);
     let out = xcservice
-        .request([SearchTag::RecordingId(254462).into()])
+        .query()
+        .add_term(SearchTerm::RecordingId(254462))
+        .send()
         .await?;
     dbg!(&out);
     Ok(())

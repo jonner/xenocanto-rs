@@ -1,225 +1,100 @@
-use std::{fmt::Display, str::FromStr};
-
 use secrecy::{ExposeSecret, SecretString};
 
-use crate::{error::Error, recording::RecordingSet};
+use crate::{
+    error::{ApiError, Error},
+    recording::RecordingSet,
+    search::SearchTerm,
+};
 
 pub mod annota;
 pub mod error;
 pub mod recording;
 pub mod request;
 pub mod search;
+mod types;
 pub mod util;
 
+pub use types::*;
+
 pub const API_ENDPOINT: &str = "https://xeno-canto.org/api/3/recordings";
-
-#[derive(Debug, serde::Deserialize, serde::Serialize)]
-#[serde(rename_all = "lowercase")]
-pub enum Sex {
-    Male,
-    Female,
-    #[serde(other)]
-    Unknown,
-}
-
-impl Display for Sex {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(
-            f,
-            "{}",
-            serde_variant::to_variant_name(self).map_err(|_| std::fmt::Error)?
-        )
-    }
-}
-
-impl TryFrom<String> for Sex {
-    type Error = String;
-
-    fn try_from(value: String) -> Result<Self, Self::Error> {
-        value.as_str().parse()
-    }
-}
-
-impl FromStr for Sex {
-    type Err = String;
-
-    fn from_str(s: &str) -> Result<Self, Self::Err> {
-        match s.to_lowercase().as_str() {
-            "male" => Ok(Sex::Male),
-            "female" => Ok(Sex::Female),
-            _ => Err("Invalid sex value".to_string()),
-        }
-    }
-}
-
-#[derive(Debug, serde::Deserialize, serde::Serialize)]
-#[serde(rename_all = "lowercase")]
-pub enum LifeStage {
-    Adult,
-    Juvenile,
-    Nestling,
-    Nymph,
-    Subadult,
-    #[serde(other)]
-    Unknown,
-}
-
-#[derive(Debug, serde::Deserialize, serde::Serialize)]
-#[serde(rename_all = "lowercase")]
-pub enum SpeciesGroup {
-    Birds,
-    Grasshoppers,
-    Bats,
-    Frogs,
-    #[serde(rename = "land mammals")]
-    LandMammals,
-    Soundscape,
-    #[serde(other)]
-    Unknown,
-}
-
-#[derive(Debug, serde::Deserialize, serde::Serialize)]
-#[serde(rename_all = "kebab-case")]
-pub enum License {
-    ByNcSa,
-    ByNcNd,
-    BySa,
-    ByNd,
-    ByNc,
-    By,
-    Cc0,
-    #[serde(other)]
-    Unknown,
-}
-
-#[derive(Debug, serde::Deserialize, serde::Serialize)]
-#[serde(rename_all = "lowercase")]
-pub enum WorldArea {
-    Africa,
-    America,
-    Asia,
-    Australia,
-    Europe,
-}
-
-#[derive(Debug, serde::Deserialize, serde::Serialize)]
-pub enum SoundType {
-    #[serde(rename = "aberrant")]
-    Aberrant,
-    #[serde(rename = "advertisement call")]
-    AdvertisementCall,
-    #[serde(rename = "agonistic call")]
-    AgonisticCall,
-    #[serde(rename = "alarm call")]
-    AlarmCall,
-    #[serde(rename = "begging call")]
-    BeggingCall,
-    #[serde(rename = "call")]
-    Call,
-    #[serde(rename = "calling song")]
-    CallingSong,
-    #[serde(rename = "courtship song")]
-    CourtshipSong,
-    #[serde(rename = "dawn song")]
-    DawnSong,
-    #[serde(rename = "defensive call")]
-    DefensiveCall,
-    #[serde(rename = "distress call")]
-    DistressCall,
-    #[serde(rename = "disturbance song")]
-    DisturbanceSong,
-    #[serde(rename = "drumming")]
-    Drumming,
-    #[serde(rename = "duet")]
-    Duet,
-    #[serde(rename = "echolocation")]
-    Echolocation,
-    #[serde(rename = "feeding buzz")]
-    FeedingBuzz,
-    #[serde(rename = "female song")]
-    FemaleSong,
-    #[serde(rename = "flight call")]
-    FlightCall,
-    #[serde(rename = "flight song")]
-    FlightSong,
-    #[serde(rename = "imitation")]
-    Imitation,
-    #[serde(rename = "mating call")]
-    MatingCall,
-    #[serde(rename = "mechanical sound")]
-    MechanicalSound,
-    #[serde(rename = "nocturnal flight call")]
-    NocturnalFlightCall,
-    #[serde(rename = "release call")]
-    ReleaseCall,
-    #[serde(rename = "rivalry song")]
-    RivalrySong,
-    #[serde(rename = "searching song")]
-    SearchingSong,
-    #[serde(rename = "social call")]
-    SocialCall,
-    #[serde(rename = "song")]
-    Song,
-    #[serde(rename = "subsong")]
-    Subsong,
-    #[serde(rename = "territorial call")]
-    TerritorialCall,
-    #[serde(other)]
-    Unknown,
-}
-
-#[derive(Debug, serde::Deserialize, serde::Serialize)]
-pub enum Quality {
-    A,
-    B,
-    C,
-    D,
-    E,
-    #[serde(other)]
-    Unknown,
-}
 
 pub struct Service {
     pub key: SecretString,
     client: reqwest::Client,
 }
 
+pub struct QueryBuilder<'a> {
+    terms: Vec<SearchTerm>,
+    page: Option<u64>,
+    limit: Option<u64>,
+    service: &'a Service,
+}
+
+impl<'a> QueryBuilder<'a> {
+    pub async fn send(self) -> Result<RecordingSet, Error> {
+        let search_terms: String = self
+            .terms
+            .into_iter()
+            .map(|t| t.to_string())
+            .collect::<Vec<_>>()
+            .join(" ");
+        tracing::debug!(search_terms);
+        let mut params = vec![
+            ("key", self.service.key.expose_secret().to_string()),
+            ("query", search_terms),
+        ];
+        if let Some(page) = self.page {
+            params.push(("page", page.to_string()))
+        }
+        if let Some(limit) = self.limit {
+            params.push(("per_page", limit.to_string()))
+        }
+        let req = self.service.client.get(API_ENDPOINT).query(&params);
+        let txt = req.send().await?.text().await?;
+
+        if let Ok(set) = serde_json::from_str::<RecordingSet>(&txt) {
+            Ok(set)
+        } else if let Ok(err) = serde_json::from_str::<ApiError>(&txt) {
+            Err(err.into())
+        } else {
+            Err(Error::Parsing(
+                "unexpected response from XC query".to_string(),
+            ))
+        }
+    }
+
+    pub fn add_term(mut self, term: SearchTerm) -> Self {
+        self.terms.push(term);
+        self
+    }
+
+    pub fn limit(mut self, lim: u64) -> Self {
+        self.limit = Some(lim);
+        self
+    }
+
+    pub fn page(mut self, pg: u64) -> Self {
+        self.page = Some(pg);
+        self
+    }
+}
+
 impl Service {
-    pub fn new(key: &str) -> Self {
+    pub fn with_key(key: &str) -> Self {
         Self {
             key: key.into(),
             client: reqwest::Client::new(),
         }
     }
 
-    pub async fn request<Q>(&self, query: Q) -> reqwest::Result<Response>
-    where
-        Q: IntoIterator<Item = search::Term>,
-    {
-        let search_terms: String = query
-            .into_iter()
-            .map(|t| t.to_string())
-            .collect::<Vec<_>>()
-            .join(" ");
-        let req = self
-            .client
-            .get(API_ENDPOINT)
-            .query(&[("key", self.key.expose_secret()), ("query", &search_terms)]);
-        req.send().await?.json().await
+    pub fn query(&'_ self) -> QueryBuilder<'_> {
+        QueryBuilder {
+            service: self,
+            terms: Default::default(),
+            page: None,
+            limit: None,
+        }
     }
-}
-
-#[derive(Debug, serde::Serialize, serde::Deserialize)]
-#[serde(untagged)]
-pub enum Response {
-    Success(RecordingSet),
-    Err(ErrorResponse),
-}
-
-#[derive(Debug, serde::Serialize, serde::Deserialize)]
-pub struct ErrorResponse {
-    #[serde(rename = "error")]
-    error: Error,
 }
 
 #[cfg(test)]
@@ -287,19 +162,17 @@ mod test {
 }
 "#;
     const TEST_ERROR: &str = r#"{
-    "error": {
-        "code": "missing_parameter",
-        "message": "no query specified"
-    }
+    "error": "client_error",
+    "message": "Missing or invalid 'key' parameter. Visit https://xeno-canto.org/account to retrieve your API key."
 }"#;
     #[test]
-    fn test_deserialization_nonresponse() {
+    fn test_deserialization_direct() {
         serde_json::from_str::<RecordingSet>(TEST_SUCCESS).expect("Failed to deserialize");
-        serde_json::from_str::<ErrorResponse>(TEST_ERROR).expect("Failed to deserialize");
+        serde_json::from_str::<ApiError>(TEST_ERROR).expect("Failed to deserialize");
     }
     #[test]
     fn test_deserialization_response() {
-        serde_json::from_str::<Response>(TEST_ERROR).expect("Failed to deserialize");
-        serde_json::from_str::<Response>(TEST_SUCCESS).expect("Failed to deserialize");
+        serde_json::from_str::<RecordingSet>(TEST_SUCCESS).expect("Failed to deserialize");
+        serde_json::from_str::<ApiError>(TEST_ERROR).expect("Failed to deserialize");
     }
 }
