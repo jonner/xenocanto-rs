@@ -70,11 +70,7 @@ impl<'a> QueryBuilder<'a> {
         let api_response = req.send().await?.text().await?;
         trace!(api_response);
 
-        if let Ok(err) = serde_json::from_str::<ApiError>(&api_response) {
-            Err(err.into())
-        } else {
-            serde_json::from_str::<QueryResults>(&api_response).map_err(Into::into)
-        }
+        parse_response(&api_response)
     }
 
     /// Add a new search field to the query
@@ -88,6 +84,14 @@ impl<'a> QueryBuilder<'a> {
     pub fn page_size(mut self, size: u16) -> Self {
         self.page_size = Some(size);
         self
+    }
+}
+
+fn parse_response(api_response: &str) -> Result<QueryResults, Error> {
+    if let Ok(err) = serde_json::from_str::<ApiError>(api_response) {
+        Err(err.into())
+    } else {
+        serde_json::from_str::<QueryResults>(api_response).map_err(Into::into)
     }
 }
 
@@ -186,7 +190,7 @@ mod test {
     }
     #[test]
     fn test_deserialization_response() {
-        serde_json::from_str::<QueryResults>(TEST_SUCCESS).expect("Failed to deserialize");
-        serde_json::from_str::<ApiError>(TEST_ERROR).expect("Failed to deserialize");
+        assert!(parse_response(TEST_SUCCESS).is_ok());
+        assert!(parse_response(TEST_ERROR).is_err());
     }
 }
