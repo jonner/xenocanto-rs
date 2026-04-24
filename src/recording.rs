@@ -65,16 +65,16 @@ pub struct Recording {
     /// the latitude of the recording in decimal coordinates
     #[serde(
         rename = "lat",
-        deserialize_with = "crate::util::deserialize_number_from_string"
+        deserialize_with = "crate::util::maybe_deserialize_number_from_string"
     )]
-    pub latitude: f64,
+    pub latitude: Option<f64>,
 
     /// the longitude of the recording in decimal coordinates
     #[serde(
         rename = "lon",
-        deserialize_with = "crate::util::deserialize_number_from_string"
+        deserialize_with = "crate::util::maybe_deserialize_number_from_string"
     )]
-    pub longitude: f64,
+    pub longitude: Option<f64>,
 
     /// the sound type of the recording (combining both predefined terms such as 'call' or 'song' and additional free text options)
     #[serde(rename = "type")]

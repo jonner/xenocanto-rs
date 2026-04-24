@@ -23,8 +23,11 @@ where
     match s.to_lowercase().as_str() {
         "male" => Ok(Some(Sex::Male)),
         "female" => Ok(Some(Sex::Female)),
-        "" => Ok(None),
-        _ => Err(serde::de::Error::unknown_variant(&s, &["male", "femail"])),
+        "uncertain" | "" => Ok(None),
+        _ => Err(serde::de::Error::unknown_variant(
+            &s,
+            &["male", "female", "uncertain"],
+        )),
     }
 }
 
@@ -44,24 +47,25 @@ where
     }
 }
 
-// pub fn deserialize_string_from_number<'de, D>(deserializer: D) -> Result<String, D::Error>
-// where
-//     D: serde::Deserializer<'de>,
-// {
-//     #[derive(serde::Deserialize)]
-//     #[serde(untagged)]
-//     enum StringOrNumber {
-//         String(String),
-//         Number(i64),
-//         Float(f64),
-//     }
+struct WrappedF64(f64);
 
-//     match StringOrNumber::deserialize(deserializer)? {
-//         StringOrNumber::String(s) => Ok(s),
-//         StringOrNumber::Number(i) => Ok(i.to_string()),
-//         StringOrNumber::Float(f) => Ok(f.to_string()),
-//     }
-// }
+impl<'de> serde::Deserialize<'de> for WrappedF64 {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: serde::Deserializer<'de>,
+    {
+        deserialize_number_from_string(deserializer).map(WrappedF64)
+    }
+}
+
+pub fn maybe_deserialize_number_from_string<'de, D>(
+    deserializer: D,
+) -> Result<Option<f64>, D::Error>
+where
+    D: serde::Deserializer<'de>,
+{
+    Option::<WrappedF64>::deserialize(deserializer).map(|opt| opt.map(|w| w.0))
+}
 
 pub fn deserialize_number_from_string<'de, T, D>(deserializer: D) -> Result<T, D::Error>
 where
