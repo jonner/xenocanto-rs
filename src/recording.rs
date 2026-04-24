@@ -82,11 +82,15 @@ pub struct Recording {
     pub sound_type: SoundType,
 
     /// the sex of the animal
-    pub sex: Sex,
+    #[serde(deserialize_with = "crate::util::deserialize_csv_to_vec")]
+    pub sex: Vec<Sex>,
 
     /// the life stage of the animal (adult, juvenile, etc.)
-    #[serde(rename = "stage")]
-    pub life_stage: LifeStage,
+    #[serde(
+        rename = "stage",
+        deserialize_with = "crate::util::deserialize_csv_to_vec"
+    )]
+    pub life_stage: Vec<LifeStage>,
 
     /// the recording method (field recording, in the hand, etc.)
     pub method: String,

@@ -1,11 +1,12 @@
 use std::{fmt::Display, str::FromStr};
 
 /// possible values for the sex field in xeno-canto recordings
-#[derive(Debug, serde::Deserialize, serde::Serialize)]
+#[derive(Debug, PartialEq, serde::Deserialize, serde::Serialize)]
 #[serde(rename_all = "lowercase")]
 pub enum Sex {
     Male,
     Female,
+    Uncertain,
     #[serde(other)]
     Unknown,
 }
@@ -35,7 +36,8 @@ impl FromStr for Sex {
         match s.to_lowercase().as_str() {
             "male" => Ok(Sex::Male),
             "female" => Ok(Sex::Female),
-            _ => Err("Invalid sex value".to_string()),
+            "uncertain" => Ok(Sex::Uncertain),
+            s => Err(format!("Invalid sex value: '{s}'")),
         }
     }
 }
@@ -49,8 +51,25 @@ pub enum LifeStage {
     Nestling,
     Nymph,
     Subadult,
+    Uncertain,
     #[serde(other)]
     Unknown,
+}
+
+impl FromStr for LifeStage {
+    type Err = String;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        match s.to_lowercase().as_str() {
+            "adult" => Ok(LifeStage::Adult),
+            "juvenile" => Ok(LifeStage::Juvenile),
+            "nestling" => Ok(LifeStage::Nestling),
+            "nymph" => Ok(LifeStage::Nymph),
+            "subadult" => Ok(LifeStage::Subadult),
+            "uncertain" => Ok(LifeStage::Uncertain),
+            s => Err(format!("Invalid life stage value '{s}'")),
+        }
+    }
 }
 
 /// possible values for the recording group field in xeno-canto queries

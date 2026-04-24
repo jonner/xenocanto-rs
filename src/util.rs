@@ -156,3 +156,21 @@ where
     let s = Option::<String>::deserialize(deserializer)?;
     Ok(s.filter(|s| !s.is_empty()))
 }
+
+pub fn deserialize_csv_to_vec<'de, D, T>(deserializer: D) -> Result<Vec<T>, D::Error>
+where
+    D: serde::Deserializer<'de>,
+    T: FromStr,
+    T::Err: std::fmt::Display,
+{
+    // First, deserialize the entire field as one big string
+    let s = String::deserialize(deserializer)?;
+
+    if s.trim().is_empty() {
+        return Ok(Vec::new());
+    }
+    // Split by comma, parse each piece, and collect into a Vec
+    s.split(',')
+        .map(|item| item.trim().parse::<T>().map_err(serde::de::Error::custom))
+        .collect()
+}

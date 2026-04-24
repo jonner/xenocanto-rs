@@ -139,7 +139,7 @@ mod test {
             "lon": "-103.4143",
             "alt": "1300",
             "type": "song",
-            "sex": "",
+            "sex": "male, female",
             "stage": "",
             "method": "field recording",
             "url": "https://xeno-canto.org/254462",
@@ -192,5 +192,11 @@ mod test {
     fn test_deserialization_response() {
         assert!(parse_response(TEST_SUCCESS).is_ok());
         assert!(parse_response(TEST_ERROR).is_err());
+    }
+    #[test]
+    fn test_parse_sex() {
+        let res = parse_response(TEST_SUCCESS).expect("Failed to parse response");
+        let rec = res.recordings.first().expect("doesn't contain a recording");
+        assert_eq!(rec.sex, &[Sex::Male, Sex::Female]);
     }
 }
