@@ -1,4 +1,5 @@
 use secrecy::{ExposeSecret, SecretString};
+use tracing::trace;
 
 use crate::{
     error::{ApiError, Error},
@@ -50,16 +51,13 @@ impl<'a> QueryBuilder<'a> {
             params.push(("per_page", limit.to_string()))
         }
         let req = self.service.client.get(API_ENDPOINT).query(&params);
-        let txt = req.send().await?.text().await?;
+        let api_response = req.send().await?.text().await?;
+        trace!(api_response);
 
-        if let Ok(set) = serde_json::from_str::<RecordingSet>(&txt) {
-            Ok(set)
-        } else if let Ok(err) = serde_json::from_str::<ApiError>(&txt) {
+        if let Ok(err) = serde_json::from_str::<ApiError>(&api_response) {
             Err(err.into())
         } else {
-            Err(Error::Parsing(
-                "unexpected response from XC query".to_string(),
-            ))
+            serde_json::from_str::<RecordingSet>(&api_response).map_err(Into::into)
         }
     }
 

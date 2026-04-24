@@ -22,6 +22,6 @@ pub enum Error {
     Api(#[from] ApiError),
     #[error(transparent)]
     Client(#[from] reqwest::Error),
-    #[error("parsing error: {0}")]
-    Parsing(String),
+    #[error(transparent)]
+    Parsing(#[from] serde_json::Error),
 }
