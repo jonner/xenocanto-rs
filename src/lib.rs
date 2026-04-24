@@ -3,14 +3,14 @@ use tracing::trace;
 
 pub mod annota;
 mod error;
-mod recording;
-mod search;
+pub mod recording;
+pub mod search;
 mod types;
 mod util;
 
 pub use error::*;
-pub use recording::*;
-pub use search::*;
+pub use recording::Recording;
+pub use search::SearchField;
 pub use types::*;
 
 const API_ENDPOINT: &str = "https://xeno-canto.org/api/3/recordings";
