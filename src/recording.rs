@@ -1,4 +1,4 @@
-use crate::{Quality, Sex, SoundType, SpeciesGroup, annota::AnnotationSet};
+use crate::{LifeStage, Quality, Sex, SoundType, SpeciesGroup, annota::AnnotationSet};
 
 #[derive(Debug, serde::Deserialize, serde::Serialize)]
 #[serde(rename_all = "lowercase")]
@@ -28,7 +28,8 @@ pub struct Oscillograms {
 #[serde(rename_all = "lowercase")]
 pub struct Recording {
     /// the catalogue number of the recording on xeno-canto
-    pub id: String,
+    #[serde(deserialize_with = "crate::util::deserialize_number_from_string")]
+    pub id: u64,
 
     /// the generic name of the species
     #[serde(rename = "gen")]
@@ -81,23 +82,22 @@ pub struct Recording {
     pub sound_type: SoundType,
 
     /// the sex of the animal
-    #[serde(deserialize_with = "crate::util::deserialize_sex")]
-    pub sex: Option<Sex>,
+    pub sex: Sex,
 
     /// the life stage of the animal (adult, juvenile, etc.)
-    #[serde(deserialize_with = "crate::util::empty_string_as_none")]
-    pub stage: Option<String>,
+    #[serde(rename = "stage")]
+    pub life_stage: LifeStage,
 
     /// the recording method (field recording, in the hand, etc.)
     pub method: String,
 
     /// the URL specifying the details of this recording
-    #[serde(with = "http_serde::uri")]
-    pub url: http::Uri,
+    #[serde(rename = "url", with = "http_serde::uri")]
+    pub info_uri: http::Uri,
 
     /// the URL to the audio file
-    #[serde(with = "http_serde::uri")]
-    pub file: http::Uri,
+    #[serde(rename = "file", with = "http_serde::uri")]
+    pub file_uri: http::Uri,
 
     /// the original file name of the audio file
     #[serde(rename = "file-name")]
@@ -124,14 +124,20 @@ pub struct Recording {
     pub length: jiff::Span,
 
     /// the time of day that the recording was made
-    #[serde(deserialize_with = "crate::util::deserialize_time")]
-    pub time: jiff::civil::Time,
+    #[serde(rename = "time", deserialize_with = "crate::util::deserialize_time")]
+    pub recording_time: jiff::civil::Time,
 
     /// the date that the recording was made
-    pub date: jiff::civil::Date,
+    #[serde(rename = "date")]
+    pub recording_date: jiff::civil::Date,
+
+    /// temperature during recording (applicable to specific groups only)
+    #[serde(rename = "temp")]
+    pub recording_temperature: Option<f64>,
 
     /// the date that the recording was uploaded to xeno-canto
-    pub uploaded: jiff::civil::Date,
+    #[serde(rename = "uploaded")]
+    pub upload_date: jiff::civil::Date,
 
     /// an array with the identified background species in the recording
     #[serde(rename = "also")]
@@ -155,9 +161,9 @@ pub struct Recording {
     )]
     pub playback_used: Option<bool>,
 
-    /// temperature during recording (applicable to specific groups only)
-    #[serde(rename = "temp")]
-    pub temperature: Option<f64>,
+    /// automatic (non-supervised) recording?
+    #[serde(rename = "auto", deserialize_with = "crate::util::yes_no_to_bool")]
+    pub automated_recording: bool,
 
     /// registration number of specimen (when collected)
     #[serde(
@@ -165,10 +171,6 @@ pub struct Recording {
         deserialize_with = "crate::util::empty_string_as_none"
     )]
     pub registration_number: Option<String>,
-
-    /// automatic (non-supervised) recording?
-    #[serde(rename = "auto", deserialize_with = "crate::util::yes_no_to_bool")]
-    pub automated_recording: bool,
 
     /// recording device used
     #[serde(rename = "dvc", deserialize_with = "crate::util::empty_string_as_none")]
@@ -186,23 +188,4 @@ pub struct Recording {
     pub sample_rate: u64,
 
     annotation_set: Option<AnnotationSet>,
-}
-
-#[derive(Debug, serde::Deserialize, serde::Serialize)]
-#[serde(rename_all = "lowercase")]
-pub struct RecordingSet {
-    #[serde(
-        rename = "numRecordings",
-        deserialize_with = "crate::util::deserialize_number_from_string"
-    )]
-    pub num_recordings: u64,
-    #[serde(
-        rename = "numSpecies",
-        deserialize_with = "crate::util::deserialize_number_from_string"
-    )]
-    pub num_species: u64,
-    pub page: u64,
-    #[serde(rename = "numPages")]
-    pub total_pages: u64,
-    pub recordings: Vec<Recording>,
 }

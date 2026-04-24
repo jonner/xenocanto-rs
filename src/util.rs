@@ -1,8 +1,6 @@
 use serde::Deserialize;
 use std::{fmt::Display, str::FromStr};
 
-use crate::Sex;
-
 pub fn yes_no_to_bool<'de, D>(deserializer: D) -> Result<bool, D::Error>
 where
     D: serde::Deserializer<'de>,
@@ -12,22 +10,6 @@ where
         "yes" => Ok(true),
         "no" => Ok(false),
         _ => Err(serde::de::Error::unknown_variant(&s, &["yes", "no"])),
-    }
-}
-
-pub fn deserialize_sex<'de, D>(deserializer: D) -> Result<Option<Sex>, D::Error>
-where
-    D: serde::Deserializer<'de>,
-{
-    let s: String = serde::Deserialize::deserialize(deserializer)?;
-    match s.to_lowercase().as_str() {
-        "male" => Ok(Some(Sex::Male)),
-        "female" => Ok(Some(Sex::Female)),
-        "uncertain" | "" => Ok(None),
-        _ => Err(serde::de::Error::unknown_variant(
-            &s,
-            &["male", "female", "uncertain"],
-        )),
     }
 }
 

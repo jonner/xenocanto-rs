@@ -1,5 +1,6 @@
 use std::{fmt::Display, str::FromStr};
 
+/// possible values for the sex field in xeno-canto recordings
 #[derive(Debug, serde::Deserialize, serde::Serialize)]
 #[serde(rename_all = "lowercase")]
 pub enum Sex {
@@ -39,6 +40,7 @@ impl FromStr for Sex {
     }
 }
 
+/// possible values for the life stage field in xeno-canto queries
 #[derive(Debug, serde::Deserialize, serde::Serialize)]
 #[serde(rename_all = "lowercase")]
 pub enum LifeStage {
@@ -51,6 +53,7 @@ pub enum LifeStage {
     Unknown,
 }
 
+/// possible values for the recording group field in xeno-canto queries
 #[derive(Debug, serde::Deserialize, serde::Serialize)]
 #[serde(rename_all = "lowercase")]
 pub enum SpeciesGroup {
@@ -65,6 +68,7 @@ pub enum SpeciesGroup {
     Unknown,
 }
 
+/// possible values for the license field in xeno-canto queries
 #[derive(Debug, serde::Deserialize, serde::Serialize)]
 #[serde(rename_all = "kebab-case")]
 pub enum License {
@@ -79,6 +83,7 @@ pub enum License {
     Unknown,
 }
 
+/// possible values for the world areas field in xeno-canto queries
 #[derive(Debug, serde::Deserialize, serde::Serialize)]
 #[serde(rename_all = "lowercase")]
 pub enum WorldArea {
@@ -89,6 +94,7 @@ pub enum WorldArea {
     Europe,
 }
 
+/// possible values for the sound type field in xeno-canto queries
 #[derive(Debug, serde::Deserialize, serde::Serialize)]
 pub enum SoundType {
     #[serde(rename = "aberrant")]
@@ -155,6 +161,7 @@ pub enum SoundType {
     Unknown,
 }
 
+/// possible values for the quality field in xeno-canto queries
 #[derive(Debug, serde::Deserialize, serde::Serialize)]
 pub enum Quality {
     A,

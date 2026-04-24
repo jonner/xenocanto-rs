@@ -1,75 +1,98 @@
 use secrecy::{ExposeSecret, SecretString};
 use tracing::trace;
 
-use crate::{
-    error::{ApiError, Error},
-    recording::RecordingSet,
-    search::SearchTerm,
-};
-
 pub mod annota;
-pub mod error;
-pub mod recording;
-pub mod request;
-pub mod search;
+mod error;
+mod recording;
+mod search;
 mod types;
-pub mod util;
+mod util;
 
+pub use error::*;
+pub use recording::*;
+pub use search::*;
 pub use types::*;
 
-pub const API_ENDPOINT: &str = "https://xeno-canto.org/api/3/recordings";
+const API_ENDPOINT: &str = "https://xeno-canto.org/api/3/recordings";
 
-pub struct Service {
-    pub key: SecretString,
+/// The main entry point for this library. a `Client` object represents a
+/// configured client that can query the xeno-canto web server and return results.
+pub struct Client {
+    key: SecretString,
     client: reqwest::Client,
 }
 
+/// A type for building queries against the xeno-canto API.
 pub struct QueryBuilder<'a> {
-    terms: Vec<SearchTerm>,
+    fields: Vec<SearchField>,
     page_size: Option<u16>,
-    service: &'a Service,
+    client: &'a Client,
+}
+
+#[derive(Debug, serde::Deserialize, serde::Serialize)]
+#[serde(rename_all = "lowercase")]
+pub struct QueryResults {
+    #[serde(
+        rename = "numRecordings",
+        deserialize_with = "crate::util::deserialize_number_from_string"
+    )]
+    pub total_recordings: u64,
+    #[serde(
+        rename = "numSpecies",
+        deserialize_with = "crate::util::deserialize_number_from_string"
+    )]
+    pub num_species: u64,
+    pub page: u64,
+    #[serde(rename = "numPages")]
+    pub total_pages: u64,
+    pub recordings: Vec<Recording>,
 }
 
 impl<'a> QueryBuilder<'a> {
-    pub async fn fetch_page(self, page: u16) -> Result<RecordingSet, Error> {
-        let search_terms: String = self
-            .terms
+    /// Build the query, send it to the xeno-canto web service and return the results
+    pub async fn fetch_page(self, page: u16) -> Result<QueryResults, Error> {
+        let search_fields: String = self
+            .fields
             .into_iter()
             .map(|t| t.to_string())
             .collect::<Vec<_>>()
             .join(" ");
-        tracing::debug!(search_terms);
+        tracing::debug!(search_fields);
         let mut params = vec![
-            ("key", self.service.key.expose_secret().to_string()),
-            ("query", search_terms),
+            ("key", self.client.key.expose_secret().to_string()),
+            ("query", search_fields),
         ];
         params.push(("page", page.to_string()));
         if let Some(limit) = self.page_size {
             params.push(("per_page", limit.to_string()))
         }
-        let req = self.service.client.get(API_ENDPOINT).query(&params);
+        let req = self.client.client.get(API_ENDPOINT).query(&params);
         let api_response = req.send().await?.text().await?;
         trace!(api_response);
 
         if let Ok(err) = serde_json::from_str::<ApiError>(&api_response) {
             Err(err.into())
         } else {
-            serde_json::from_str::<RecordingSet>(&api_response).map_err(Into::into)
+            serde_json::from_str::<QueryResults>(&api_response).map_err(Into::into)
         }
     }
 
-    pub fn add_term(mut self, term: SearchTerm) -> Self {
-        self.terms.push(term);
+    /// Add a new search field to the query
+    pub fn and(mut self, field: SearchField) -> Self {
+        self.fields.push(field);
         self
     }
 
+    /// Specify the page size of the results that will be returned. Valid
+    /// values range from 50 to 500
     pub fn page_size(mut self, size: u16) -> Self {
         self.page_size = Some(size);
         self
     }
 }
 
-impl Service {
+impl Client {
+    /// Create a new xeno-canto webservice client with the specified API Key
     pub fn with_key(key: &str) -> Self {
         Self {
             key: key.into(),
@@ -77,10 +100,12 @@ impl Service {
         }
     }
 
-    pub fn build_query(&'_ self) -> QueryBuilder<'_> {
+    /// Returns a new object for querying the xeno-canto web service with the
+    /// given `field`. Build more complex queries using the [QueryBuilder] API.
+    pub fn build_query(&'_ self, field: SearchField) -> QueryBuilder<'_> {
         QueryBuilder {
-            service: self,
-            terms: Default::default(),
+            client: self,
+            fields: vec![field],
             page_size: None,
         }
     }
@@ -156,12 +181,12 @@ mod test {
 }"#;
     #[test]
     fn test_deserialization_direct() {
-        serde_json::from_str::<RecordingSet>(TEST_SUCCESS).expect("Failed to deserialize");
+        serde_json::from_str::<QueryResults>(TEST_SUCCESS).expect("Failed to deserialize");
         serde_json::from_str::<ApiError>(TEST_ERROR).expect("Failed to deserialize");
     }
     #[test]
     fn test_deserialization_response() {
-        serde_json::from_str::<RecordingSet>(TEST_SUCCESS).expect("Failed to deserialize");
+        serde_json::from_str::<QueryResults>(TEST_SUCCESS).expect("Failed to deserialize");
         serde_json::from_str::<ApiError>(TEST_ERROR).expect("Failed to deserialize");
     }
 }
