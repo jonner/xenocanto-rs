@@ -26,13 +26,12 @@ pub struct Service {
 
 pub struct QueryBuilder<'a> {
     terms: Vec<SearchTerm>,
-    page: Option<u64>,
-    limit: Option<u64>,
+    page_size: Option<u16>,
     service: &'a Service,
 }
 
 impl<'a> QueryBuilder<'a> {
-    pub async fn send(self) -> Result<RecordingSet, Error> {
+    pub async fn fetch_page(self, page: u16) -> Result<RecordingSet, Error> {
         let search_terms: String = self
             .terms
             .into_iter()
@@ -44,10 +43,8 @@ impl<'a> QueryBuilder<'a> {
             ("key", self.service.key.expose_secret().to_string()),
             ("query", search_terms),
         ];
-        if let Some(page) = self.page {
-            params.push(("page", page.to_string()))
-        }
-        if let Some(limit) = self.limit {
+        params.push(("page", page.to_string()));
+        if let Some(limit) = self.page_size {
             params.push(("per_page", limit.to_string()))
         }
         let req = self.service.client.get(API_ENDPOINT).query(&params);
@@ -66,13 +63,8 @@ impl<'a> QueryBuilder<'a> {
         self
     }
 
-    pub fn limit(mut self, lim: u64) -> Self {
-        self.limit = Some(lim);
-        self
-    }
-
-    pub fn page(mut self, pg: u64) -> Self {
-        self.page = Some(pg);
+    pub fn page_size(mut self, size: u16) -> Self {
+        self.page_size = Some(size);
         self
     }
 }
@@ -85,12 +77,11 @@ impl Service {
         }
     }
 
-    pub fn query(&'_ self) -> QueryBuilder<'_> {
+    pub fn build_query(&'_ self) -> QueryBuilder<'_> {
         QueryBuilder {
             service: self,
             terms: Default::default(),
-            page: None,
-            limit: None,
+            page_size: None,
         }
     }
 }
