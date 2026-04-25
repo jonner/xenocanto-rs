@@ -45,7 +45,7 @@ pub struct Recording {
 
     /// the group to which the species belongs (birds, grasshoppers, bats)
     #[serde(rename = "grp")]
-    pub group: SpeciesGroup,
+    pub group: Option<SpeciesGroup>,
 
     /// the English name of the species
     #[serde(rename = "en")]
