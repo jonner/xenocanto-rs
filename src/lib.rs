@@ -34,13 +34,6 @@ pub struct QueryResults {
     pub recordings: Vec<Recording>,
 }
 
-/// The main entry point for this library. a `Client` object represents a
-/// configured client that can query the xeno-canto web server and return results.
-pub struct Client {
-    key: SecretString,
-    client: reqwest::Client,
-}
-
 #[derive(Debug, Default)]
 pub struct Query {
     fields: Vec<SearchField>,
@@ -73,6 +66,13 @@ fn parse_response(api_response: &str) -> Result<QueryResults, Error> {
     }
 }
 
+/// The main entry point for this library. a `Client` object represents a
+/// configured client that can query the xeno-canto web server and return results.
+pub struct Client {
+    key: SecretString,
+    client: reqwest::Client,
+}
+
 impl Client {
     /// Create a new xeno-canto webservice client with the specified API Key
     pub fn with_key(key: &str) -> Self {
@@ -84,7 +84,7 @@ impl Client {
 
     /// Build the query, send it to the xeno-canto web service and return the results
     pub async fn fetch(
-        self,
+        &self,
         query: &Query,
         page: Option<u16>,
         page_size: Option<u16>,
