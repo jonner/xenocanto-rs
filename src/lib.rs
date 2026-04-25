@@ -106,10 +106,10 @@ impl Client {
 
     /// Returns a new object for querying the xeno-canto web service with the
     /// given `field`. Build more complex queries using the [QueryBuilder] API.
-    pub fn build_query(&'_ self, field: SearchField) -> QueryBuilder<'_> {
+    pub fn build_query(&'_ self) -> QueryBuilder<'_> {
         QueryBuilder {
             client: self,
-            fields: vec![field],
+            fields: Default::default(),
             page_size: None,
         }
     }
