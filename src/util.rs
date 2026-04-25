@@ -128,7 +128,7 @@ pub fn permissive_date<'de, D>(deserializer: D) -> Result<Option<jiff::civil::Da
 where
     D: serde::Deserializer<'de>,
 {
-    let mut s = String::deserialize(deserializer)?;
+    let s = String::deserialize(deserializer)?;
 
     // Attempt standard parse first
     if let Ok(t) = s.parse::<jiff::civil::Date>() {

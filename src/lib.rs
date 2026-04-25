@@ -15,20 +15,6 @@ pub use types::*;
 
 const API_ENDPOINT: &str = "https://xeno-canto.org/api/3/recordings";
 
-/// The main entry point for this library. a `Client` object represents a
-/// configured client that can query the xeno-canto web server and return results.
-pub struct Client {
-    key: SecretString,
-    client: reqwest::Client,
-}
-
-/// A type for building queries against the xeno-canto API.
-pub struct QueryBuilder<'a> {
-    fields: Vec<SearchField>,
-    page_size: Option<u16>,
-    client: &'a Client,
-}
-
 #[derive(Debug, serde::Deserialize, serde::Serialize)]
 #[serde(rename_all = "lowercase")]
 pub struct QueryResults {
@@ -48,33 +34,56 @@ pub struct QueryResults {
     pub recordings: Vec<Recording>,
 }
 
-impl<'a> QueryBuilder<'a> {
-    /// Build the query, send it to the xeno-canto web service and return the results
-    pub async fn fetch_page(self, page: u16) -> Result<QueryResults, Error> {
-        let search_fields: String = self
-            .fields
-            .into_iter()
-            .map(|t| t.to_string())
-            .collect::<Vec<_>>()
-            .join(" ");
-        tracing::debug!(search_fields);
-        let mut params = vec![
-            ("key", self.client.key.expose_secret().to_string()),
-            ("query", search_fields),
-        ];
-        params.push(("page", page.to_string()));
-        if let Some(limit) = self.page_size {
-            params.push(("per_page", limit.to_string()))
-        }
-        let req = self.client.client.get(API_ENDPOINT).query(&params);
-        let api_response = req.send().await?.text().await?;
-        trace!(api_response);
+/// The main entry point for this library. a `Client` object represents a
+/// configured client that can query the xeno-canto web server and return results.
+pub struct Client {
+    key: SecretString,
+    client: reqwest::Client,
+}
 
-        parse_response(&api_response)
+pub struct Query {
+    fields: Vec<SearchField>,
+    page_size: Option<u16>,
+    page: Option<u16>,
+}
+
+impl Query {
+    pub fn builder() -> QueryBuilder {
+        QueryBuilder::default()
     }
 
+    pub fn params(&self) -> Vec<(&str, String)> {
+        [
+            (
+                "query",
+                Some(
+                    self.fields
+                        .iter()
+                        .map(|t| t.to_string())
+                        .collect::<Vec<_>>()
+                        .join(" "),
+                ),
+            ),
+            ("page", self.page.map(|n| n.to_string())),
+            ("per_page", self.page_size.map(|n| n.to_string())),
+        ]
+        .into_iter()
+        .filter_map(|item| item.1.map(|val| (item.0, val)))
+        .collect()
+    }
+}
+
+/// A type for building queries against the xeno-canto API.
+#[derive(Debug, Default)]
+pub struct QueryBuilder {
+    fields: Vec<SearchField>,
+    page_size: Option<u16>,
+    page: Option<u16>,
+}
+
+impl QueryBuilder {
     /// Add a new search field to the query
-    pub fn and(mut self, field: SearchField) -> Self {
+    pub fn field(mut self, field: SearchField) -> Self {
         self.fields.push(field);
         self
     }
@@ -84,6 +93,20 @@ impl<'a> QueryBuilder<'a> {
     pub fn page_size(mut self, size: u16) -> Self {
         self.page_size = Some(size);
         self
+    }
+
+    /// Specify the page that will be returned.
+    pub fn page(mut self, page: u16) -> Self {
+        self.page = Some(page);
+        self
+    }
+
+    pub fn build(self) -> Query {
+        Query {
+            fields: self.fields,
+            page_size: self.page_size,
+            page: self.page,
+        }
     }
 }
 
@@ -104,14 +127,15 @@ impl Client {
         }
     }
 
-    /// Returns a new object for querying the xeno-canto web service with the
-    /// given `field`. Build more complex queries using the [QueryBuilder] API.
-    pub fn build_query(&'_ self) -> QueryBuilder<'_> {
-        QueryBuilder {
-            client: self,
-            fields: Default::default(),
-            page_size: None,
-        }
+    /// Build the query, send it to the xeno-canto web service and return the results
+    pub async fn fetch(self, query: &Query) -> Result<QueryResults, Error> {
+        let mut params = vec![("key", self.key.expose_secret().to_string())];
+        params.extend(query.params());
+        let req = self.client.get(API_ENDPOINT).query(&params);
+        let api_response = req.send().await?.text().await?;
+        trace!(api_response);
+
+        parse_response(&api_response)
     }
 }
 

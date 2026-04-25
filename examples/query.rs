@@ -1,6 +1,6 @@
 use clap::Parser;
 
-use xenocanto::SearchField;
+use xenocanto::{Query, SearchField};
 
 #[derive(clap::Parser)]
 #[command(group(
@@ -9,6 +9,8 @@ use xenocanto::SearchField;
         .multiple(true),
 ))]
 struct Args {
+    #[arg(long)]
+    page: Option<u16>,
     #[arg(long)]
     page_size: Option<u16>,
     #[arg(long, group = "field")]
@@ -67,54 +69,57 @@ async fn main() -> anyhow::Result<()> {
     tracing_subscriber::fmt::init();
     let args = Args::parse();
     let xcservice = xenocanto::Client::with_key(&std::env::var("XC_API_KEY")?);
-    let mut query = xcservice.build_query();
+    let mut query = Query::builder();
+    if let Some(val) = args.page {
+        query = query.page(val);
+    }
     if let Some(val) = args.page_size {
         query = query.page_size(val);
     }
 
     if let Some(val) = args.genus {
-        query = query.and(SearchField::Genus(val));
+        query = query.field(SearchField::Genus(val));
     }
     if let Some(val) = args.species {
-        query = query.and(SearchField::Species(val));
+        query = query.field(SearchField::Species(val));
     }
     if let Some(val) = args.subspecies {
-        query = query.and(SearchField::Subspecies(val));
+        query = query.field(SearchField::Subspecies(val));
     }
     if let Some(val) = args.recordist {
-        query = query.and(SearchField::Recordist(val));
+        query = query.field(SearchField::Recordist(val));
     }
     if let Some(val) = args.country {
-        query = query.and(SearchField::Country(val));
+        query = query.field(SearchField::Country(val));
     }
     if let Some(val) = args.location {
-        query = query.and(SearchField::Location(val));
+        query = query.field(SearchField::Location(val));
     }
     if let Some(val) = args.remarks {
-        query = query.and(SearchField::Remarks(val));
+        query = query.field(SearchField::Remarks(val));
     }
     if let Some(val) = args.seen {
-        query = query.and(SearchField::Seen(val));
+        query = query.field(SearchField::Seen(val));
     }
     if let Some(val) = args.playback {
-        query = query.and(SearchField::Playback(val));
+        query = query.field(SearchField::Playback(val));
     }
     if let Some(val) = args.id {
-        query = query.and(SearchField::RecordingId(val));
+        query = query.field(SearchField::RecordingId(val));
     }
     if let Some(val) = args.since {
-        query = query.and(SearchField::Since(val));
+        query = query.field(SearchField::Since(val));
     }
     if let Some(val) = args.automated {
-        query = query.and(SearchField::Automated(val));
+        query = query.field(SearchField::Automated(val));
     }
     if let Some(val) = args.device {
-        query = query.and(SearchField::Device(val));
+        query = query.field(SearchField::Device(val));
     }
     if let Some(val) = args.microphone {
-        query = query.and(SearchField::Microphone(val));
+        query = query.field(SearchField::Microphone(val));
     }
-    let out = query.fetch_page(1).await?;
+    let out = xcservice.fetch(&query.build()).await?;
     println!(
         "Got page {} of {} ({} total recordings)",
         out.page, out.total_pages, out.total_recordings
