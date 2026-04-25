@@ -92,7 +92,7 @@ where
     deserializer.deserialize_any(StringOrNumber(std::marker::PhantomData))
 }
 
-pub fn deserialize_time<'de, D>(deserializer: D) -> Result<jiff::civil::Time, D::Error>
+pub fn permissive_time<'de, D>(deserializer: D) -> Result<Option<jiff::civil::Time>, D::Error>
 where
     D: serde::Deserializer<'de>,
 {
@@ -100,7 +100,7 @@ where
 
     // Attempt standard parse first
     if let Ok(t) = s.parse::<jiff::civil::Time>() {
-        return Ok(t);
+        return Ok(Some(t));
     }
 
     // 1. Handle single-digit hours (e.g., "9:30" -> "09:30")
@@ -116,12 +116,27 @@ where
         let extended = format!("{}:00", s);
         return extended
             .parse::<jiff::civil::Time>()
-            .map_err(serde::de::Error::custom);
+            .map_err(serde::de::Error::custom)
+            .map(Some);
     }
 
-    Err(serde::de::Error::custom(
-        "invalid time format; expected HH:MM or HH:MM:SS",
-    ))
+    tracing::warn!(s, "invalid time format; expected HH:MM or HH:MM:SS",);
+    Ok(None)
+}
+
+pub fn permissive_date<'de, D>(deserializer: D) -> Result<Option<jiff::civil::Date>, D::Error>
+where
+    D: serde::Deserializer<'de>,
+{
+    let mut s = String::deserialize(deserializer)?;
+
+    // Attempt standard parse first
+    if let Ok(t) = s.parse::<jiff::civil::Date>() {
+        return Ok(Some(t));
+    }
+
+    tracing::warn!(s, "invalid date format",);
+    Ok(None)
 }
 
 pub fn deserialize_duration<'de, D>(deserializer: D) -> Result<jiff::Span, D::Error>

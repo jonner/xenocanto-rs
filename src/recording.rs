@@ -128,15 +128,18 @@ pub struct Recording {
     pub length: jiff::Span,
 
     /// the time of day that the recording was made
-    #[serde(rename = "time", deserialize_with = "crate::util::deserialize_time")]
-    pub recording_time: jiff::civil::Time,
+    #[serde(rename = "time", deserialize_with = "crate::util::permissive_time")]
+    pub recording_time: Option<jiff::civil::Time>,
 
     /// the date that the recording was made
-    #[serde(rename = "date")]
-    pub recording_date: jiff::civil::Date,
+    #[serde(rename = "date", deserialize_with = "crate::util::permissive_date")]
+    pub recording_date: Option<jiff::civil::Date>,
 
     /// temperature during recording (applicable to specific groups only)
-    #[serde(rename = "temp")]
+    #[serde(
+        rename = "temp",
+        deserialize_with = "crate::util::maybe_deserialize_number_from_string"
+    )]
     pub recording_temperature: Option<f64>,
 
     /// the date that the recording was uploaded to xeno-canto
@@ -166,8 +169,11 @@ pub struct Recording {
     pub playback_used: Option<bool>,
 
     /// automatic (non-supervised) recording?
-    #[serde(rename = "auto", deserialize_with = "crate::util::yes_no_to_bool")]
-    pub automated_recording: bool,
+    #[serde(
+        rename = "auto",
+        deserialize_with = "crate::util::maybe_yes_no_to_bool"
+    )]
+    pub automated_recording: Option<bool>,
 
     /// registration number of specimen (when collected)
     #[serde(
