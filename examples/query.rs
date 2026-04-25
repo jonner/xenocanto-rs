@@ -69,14 +69,7 @@ async fn main() -> anyhow::Result<()> {
     tracing_subscriber::fmt::init();
     let args = Args::parse();
     let xcservice = xenocanto::Client::with_key(&std::env::var("XC_API_KEY")?);
-    let mut query = Query::builder();
-    if let Some(val) = args.page {
-        query = query.page(val);
-    }
-    if let Some(val) = args.page_size {
-        query = query.page_size(val);
-    }
-
+    let mut query = Query::default();
     if let Some(val) = args.genus {
         query = query.field(SearchField::Genus(val));
     }
@@ -119,7 +112,8 @@ async fn main() -> anyhow::Result<()> {
     if let Some(val) = args.microphone {
         query = query.field(SearchField::Microphone(val));
     }
-    let out = xcservice.fetch(&query.build()).await?;
+
+    let out = xcservice.fetch(&query, args.page, args.page_size).await?;
     println!(
         "Got page {} of {} ({} total recordings)",
         out.page, out.total_pages, out.total_recordings

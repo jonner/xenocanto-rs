@@ -41,72 +41,27 @@ pub struct Client {
     client: reqwest::Client,
 }
 
+#[derive(Debug, Default)]
 pub struct Query {
     fields: Vec<SearchField>,
-    page_size: Option<u16>,
-    page: Option<u16>,
 }
 
 impl Query {
-    pub fn builder() -> QueryBuilder {
-        QueryBuilder::default()
+    pub fn new() -> Self {
+        Self::default()
     }
 
-    pub fn params(&self) -> Vec<(&str, String)> {
-        [
-            (
-                "query",
-                Some(
-                    self.fields
-                        .iter()
-                        .map(|t| t.to_string())
-                        .collect::<Vec<_>>()
-                        .join(" "),
-                ),
-            ),
-            ("page", self.page.map(|n| n.to_string())),
-            ("per_page", self.page_size.map(|n| n.to_string())),
-        ]
-        .into_iter()
-        .filter_map(|item| item.1.map(|val| (item.0, val)))
-        .collect()
-    }
-}
-
-/// A type for building queries against the xeno-canto API.
-#[derive(Debug, Default)]
-pub struct QueryBuilder {
-    fields: Vec<SearchField>,
-    page_size: Option<u16>,
-    page: Option<u16>,
-}
-
-impl QueryBuilder {
-    /// Add a new search field to the query
     pub fn field(mut self, field: SearchField) -> Self {
         self.fields.push(field);
         self
     }
 
-    /// Specify the page size of the results that will be returned. Valid
-    /// values range from 50 to 500
-    pub fn page_size(mut self, size: u16) -> Self {
-        self.page_size = Some(size);
-        self
-    }
-
-    /// Specify the page that will be returned.
-    pub fn page(mut self, page: u16) -> Self {
-        self.page = Some(page);
-        self
-    }
-
-    pub fn build(self) -> Query {
-        Query {
-            fields: self.fields,
-            page_size: self.page_size,
-            page: self.page,
-        }
+    pub fn params(&self) -> String {
+        self.fields
+            .iter()
+            .map(|t| t.to_string())
+            .collect::<Vec<_>>()
+            .join(" ")
     }
 }
 
@@ -128,9 +83,20 @@ impl Client {
     }
 
     /// Build the query, send it to the xeno-canto web service and return the results
-    pub async fn fetch(self, query: &Query) -> Result<QueryResults, Error> {
+    pub async fn fetch(
+        self,
+        query: &Query,
+        page: Option<u16>,
+        page_size: Option<u16>,
+    ) -> Result<QueryResults, Error> {
         let mut params = vec![("key", self.key.expose_secret().to_string())];
-        params.extend(query.params());
+        if let Some(page) = page {
+            params.push(("page", page.to_string()));
+        }
+        if let Some(page_size) = page_size {
+            params.push(("per_page", page_size.to_string()));
+        }
+        params.push(("query", query.params()));
         let req = self.client.get(API_ENDPOINT).query(&params);
         let api_response = req.send().await?.text().await?;
         trace!(api_response);
