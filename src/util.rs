@@ -139,7 +139,7 @@ where
     Ok(None)
 }
 
-pub fn deserialize_duration<'de, D>(deserializer: D) -> Result<jiff::Span, D::Error>
+pub fn deserialize_duration<'de, D>(deserializer: D) -> Result<jiff::SignedDuration, D::Error>
 where
     D: serde::Deserializer<'de>,
 {
@@ -150,13 +150,13 @@ where
         [m, s] => {
             let m = m.parse::<i64>().map_err(serde::de::Error::custom)?;
             let s = s.parse::<i64>().map_err(serde::de::Error::custom)?;
-            Ok(jiff::Span::new().minutes(m).seconds(s))
+            Ok(jiff::SignedDuration::new(60 * m + s, 0))
         }
         [h, m, s] => {
             let h = h.parse::<i64>().map_err(serde::de::Error::custom)?;
             let m = m.parse::<i64>().map_err(serde::de::Error::custom)?;
             let s = s.parse::<i64>().map_err(serde::de::Error::custom)?;
-            Ok(jiff::Span::new().hours(h).minutes(m).seconds(s))
+            Ok(jiff::SignedDuration::new(60 * 60 * h + 60 * m + s, 0))
         }
         _ => Err(serde::de::Error::custom(
             "Format must be [h:]m:ss or [h:]mm:ss",

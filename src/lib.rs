@@ -1,5 +1,13 @@
+use std::{
+    path::{Path, PathBuf},
+    thread::sleep,
+    time::Duration,
+};
+
+use futures_util::StreamExt;
 use secrecy::{ExposeSecret, SecretString};
-use tracing::trace;
+use tokio::io::AsyncWriteExt;
+use tracing::{debug, trace};
 
 pub mod annota;
 mod error;
@@ -102,6 +110,67 @@ impl Client {
         trace!(api_response);
 
         parse_response(&api_response)
+    }
+
+    pub async fn download_all<P>(&self, query: Query, dir: P) -> Result<u64, Error>
+    where
+        P: AsRef<Path>,
+    {
+        let mut all_recordings = Vec::new();
+        let mut downloaded = 0;
+        let mut page = 1;
+        loop {
+            let api_response = self.fetch(&query, Some(page), Some(50)).await?;
+            tokio::fs::create_dir_all(dir.as_ref()).await?;
+            debug!("Got page {page}");
+            for rec in api_response.recordings.iter() {
+                let extension = Path::new(&rec.file_name).extension();
+                let filename = format!(
+                    "XC{}-{}-{}{}",
+                    rec.id,
+                    rec.genus,
+                    rec.species,
+                    extension
+                        .map(|ext| format!(".{}", ext.to_string_lossy()))
+                        .unwrap_or_default()
+                );
+                let output: PathBuf = [dir.as_ref(), Path::new(&filename)].iter().collect();
+
+                let mut file = tokio::fs::OpenOptions::new()
+                    .write(true)
+                    .create_new(true)
+                    .open(output)
+                    .await?;
+
+                debug!("Downloading file {}", rec.id);
+                let file_response = reqwest::get(rec.file_uri.to_string()).await?;
+                let mut stream = file_response.bytes_stream();
+                while let Some(item) = stream.next().await {
+                    let chunk = item?;
+                    file.write_all(&chunk).await?;
+                }
+                downloaded += 1;
+                // sleep(Duration::from_millis(100));
+            }
+            all_recordings.extend(api_response.recordings);
+
+            if api_response.page == api_response.total_pages {
+                break;
+            }
+            page += 1;
+        }
+
+        let datafile_str = serde_json::to_string_pretty(&all_recordings)?;
+        let datafile_path: PathBuf = [dir.as_ref(), Path::new("info.json")].iter().collect();
+        let mut file = tokio::fs::OpenOptions::new()
+            .write(true)
+            .create_new(true)
+            .open(&datafile_path)
+            .await?;
+        file.write_all(datafile_str.as_bytes()).await?;
+        debug!("write info file to {}", datafile_path.display());
+
+        Ok(downloaded)
     }
 }
 

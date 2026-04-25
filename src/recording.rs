@@ -125,7 +125,7 @@ pub struct Recording {
 
     /// the length of the recording in minutes
     #[serde(deserialize_with = "crate::util::deserialize_duration")]
-    pub length: jiff::Span,
+    pub length: jiff::SignedDuration,
 
     /// the time of day that the recording was made
     #[serde(rename = "time", deserialize_with = "crate::util::permissive_time")]

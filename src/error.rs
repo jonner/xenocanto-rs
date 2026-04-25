@@ -24,4 +24,6 @@ pub enum Error {
     Client(#[from] reqwest::Error),
     #[error(transparent)]
     Parsing(#[from] serde_json::Error),
+    #[error(transparent)]
+    IO(#[from] std::io::Error),
 }
